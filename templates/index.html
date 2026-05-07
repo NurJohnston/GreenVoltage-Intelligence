@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TerraVolt Intelligence - Renewable Energy AI</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #0a0a2a;
+            color: white;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #0d3b1a, #1a472a);
+            padding: 15px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid #2ecc71;
+        }
+        
+        .logo h1 {
+            font-size: 1.5rem;
+            letter-spacing: 2px;
+        }
+        
+        .logo p {
+            font-size: 0.75rem;
+            color: #2ecc71;
+        }
+        
+        .nav a {
+            color: white;
+            text-decoration: none;
+            margin-left: 20px;
+            padding: 8px 16px;
+            border-radius: 5px;
+            transition: background 0.2s;
+        }
+        
+        .nav a:hover {
+            background: #2ecc71;
+            color: #0a0a2a;
+        }
+        
+        .main {
+            flex: 1;
+            display: flex;
+        }
+        
+        .sidebar {
+            width: 350px;
+            background: #1a1a3a;
+            padding: 20px;
+            overflow-y: auto;
+            border-right: 1px solid #2ecc71;
+        }
+        
+        .map-container {
+            flex: 1;
+        }
+        
+        #map {
+            height: 100%;
+            width: 100%;
+        }
+        
+        .info-card {
+            background: #0a0a2a;
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 20px;
+            border: 1px solid #2ecc71;
+        }
+        
+        .info-card h3 {
+            color: #2ecc71;
+            margin-bottom: 10px;
+        }
+        
+        .score {
+            font-size: 2rem;
+            font-weight: bold;
+            text-align: center;
+            margin: 10px 0;
+        }
+        
+        .score-solar { color: #f39c12; }
+        .score-wind { color: #3498db; }
+        .score-hybrid { color: #2ecc71; }
+        
+        .metric {
+            display: flex;
+            justify-content: space-between;
+            margin: 8px 0;
+            padding: 5px 0;
+            border-bottom: 1px solid #2a2a4a;
+        }
+        
+        .recommendation {
+            background: #1a2a1a;
+            padding: 10px;
+            border-radius: 8px;
+            margin-top: 10px;
+            font-size: 0.9rem;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 20px;
+            color: #2ecc71;
+        }
+        
+        .top-list {
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        
+        .top-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px;
+            border-bottom: 1px solid #2a2a4a;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        
+        .top-item:hover {
+            background: #2a2a4a;
+        }
+        
+        .top-rank {
+            color: #2ecc71;
+            font-weight: bold;
+            width: 30px;
+        }
+        
+        .top-name {
+            flex: 1;
+        }
+        
+        .top-score {
+            font-weight: bold;
+        }
+        
+        button {
+            background: #2ecc71;
+            color: #0a0a2a;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 5px;
+            cursor: pointer;
+            width: 100%;
+            margin-top: 10px;
+        }
+        
+        button:hover {
+            background: #27ae60;
+        }
+        
+        select {
+            width: 100%;
+            padding: 8px;
+            margin: 10px 0;
+            background: #1a1a3a;
+            color: white;
+            border: 1px solid #2ecc71;
+            border-radius: 5px;
+        }
+        
+        .attribution {
+            font-size: 0.7rem;
+            text-align: center;
+            padding: 10px;
+            background: #0a0a2a;
+            border-top: 1px solid #2ecc71;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="logo">
+            <h1>🌍 TERRAVOLT INTELLIGENCE</h1>
+            <p>AI-Powered Renewable Energy Optimization</p>
+        </div>
+        <div class="nav">
+            <a href="#" onclick="showTopLocations('hybrid')">Top Hybrid</a>
+            <a href="#" onclick="showTopLocations('solar')">Top Solar</a>
+            <a href="#" onclick="showTopLocations('wind')">Top Wind</a>
+        </div>
+    </div>
+    
+    <div class="main">
+        <div class="sidebar">
+            <div class="info-card">
+                <h3>📍 Click on Map</h3>
+                <p>Select any location on the map to analyze renewable energy potential.</p>
+            </div>
+            
+            <div id="results" style="display: none;">
+                <div class="info-card">
+                    <h3>📊 Energy Analysis</h3>
+                    <div id="location-name" style="color: #2ecc71; margin-bottom: 10px;"></div>
+                    
+                    <div class="metric">
+                        <span>☀️ Solar Score:</span>
+                        <span id="solar-score" class="score-solar">-</span>
+                    </div>
+                    <div class="metric">
+                        <span>Solar Irradiance:</span>
+                        <span id="solar-irradiance">- W/m²</span>
+                    </div>
+                    
+                    <div class="metric">
+                        <span>💨 Wind Score:</span>
+                        <span id="wind-score" class="score-wind">-</span>
+                    </div>
+                    <div class="metric">
+                        <span>Wind Speed:</span>
+                        <span id="wind-speed">- m/s</span>
+                    </div>
+                    
+                    <div class="metric">
+                        <span>⚡ Hybrid Score:</span>
+                        <span id="hybrid-score" class="score-hybrid">-</span>
+                    </div>
+                    
+                    <div id="recommendation" class="recommendation"></div>
+                </div>
+            </div>
+            
+            <div class="info-card">
+                <h3>🏆 Top Locations</h3>
+                <div style="display: flex; gap: 10px; margin-bottom: 10px;">
+                    <button onclick="showTopLocations('hybrid')" style="margin: 0;">Hybrid</button>
+                    <button onclick="showTopLocations('solar')" style="margin: 0;">Solar</button>
+                    <button onclick="showTopLocations('wind')" style="margin: 0;">Wind</button>
+                </div>
+                <div id="top-list" class="top-list">
+                    <div class="loading">Loading top locations...</div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="map-container">
+            <div id="map"></div>
+        </div>
+    </div>
+    
+    <div class="attribution">
+        Data sources: NASA POWER (Solar) | Open-Meteo (Wind) | OpenStreetMap (Map)
+    </div>
+    
+    <script>
+        // Initialize map
+        var map = L.map('map').setView([20, 0], 2);
+        
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; CartoDB',
+            subdomains: 'abcd',
+            maxZoom: 19,
+            minZoom: 1
+        }).addTo(map);
+        
+        var currentMarker = null;
+        
+        async function analyzeLocation(lat, lon) {
+            const resultsDiv = document.getElementById('results');
+            resultsDiv.style.display = 'block';
+            
+            document.getElementById('solar-score').innerHTML = '...';
+            document.getElementById('wind-score').innerHTML = '...';
+            document.getElementById('hybrid-score').innerHTML = '...';
+            document.getElementById('location-name').innerHTML = 'Analyzing...';
+            
+            try {
+                const response = await fetch('/api/analyze', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ lat: lat, lon: lon })
+                });
+                
+                const data = await response.json();
+                
+                document.getElementById('location-name').innerHTML = `📍 ${data.location}`;
+                document.getElementById('solar-score').innerHTML = `${data.solar_score}/100`;
+                document.getElementById('solar-irradiance').innerHTML = `${data.solar_irradiance} W/m²`;
+                document.getElementById('wind-score').innerHTML = `${data.wind_score}/100`;
+                document.getElementById('wind-speed').innerHTML = `${data.wind_speed} m/s`;
+                document.getElementById('hybrid-score').innerHTML = `${data.hybrid_score}/100`;
+                document.getElementById('recommendation').innerHTML = data.recommendation;
+                
+            } catch (error) {
+                console.error('Error:', error);
+                document.getElementById('location-name').innerHTML = 'Error analyzing location';
+                document.getElementById('solar-score').innerHTML = 'Error';
+                document.getElementById('wind-score').innerHTML = 'Error';
+                document.getElementById('hybrid-score').innerHTML = 'Error';
+                document.getElementById('recommendation').innerHTML = 'Failed to fetch data. Please try again.';
+            }
+        }
+        
+        map.on('click', function(e) {
+            const lat = e.latlng.lat;
+            const lon = e.latlng.lng;
+            
+            if (currentMarker) {
+                map.removeLayer(currentMarker);
+            }
+            
+            currentMarker = L.marker([lat, lon]).addTo(map);
+            currentMarker.bindPopup(`📍 Analyzing location...`).openPopup();
+            
+            analyzeLocation(lat, lon);
+            
+            setTimeout(() => {
+                if (currentMarker) {
+                    currentMarker.setPopupContent(`📍 <b>Selected Location</b><br>Lat: ${lat.toFixed(4)}<br>Lon: ${lon.toFixed(4)}`);
+                }
+            }, 2000);
+        });
+        
+        async function showTopLocations(type) {
+            const topListDiv = document.getElementById('top-list');
+            topListDiv.innerHTML = '<div class="loading">Loading...</div>';
+            
+            try {
+                const response = await fetch(`/api/top?type=${type}&limit=10`);
+                const data = await response.json();
+                
+                topListDiv.innerHTML = '';
+                
+                data.locations.forEach((loc, index) => {
+                    const item = document.createElement('div');
+                    item.className = 'top-item';
+                    item.onclick = () => {
+                        map.setView([loc.lat, loc.lon], 6);
+                        analyzeLocation(loc.lat, loc.lon);
+                        
+                        if (currentMarker) {
+                            map.removeLayer(currentMarker);
+                        }
+                        currentMarker = L.marker([loc.lat, loc.lon]).addTo(map);
+                        currentMarker.bindPopup(`📍 ${loc.name}`).openPopup();
+                    };
+                    
+                    let score;
+                    if (type === 'solar') score = loc.solar;
+                    else if (type === 'wind') score = loc.wind;
+                    else score = loc.hybrid;
+                    
+                    let scoreColor;
+                    if (type === 'solar') scoreColor = '#f39c12';
+                    else if (type === 'wind') scoreColor = '#3498db';
+                    else scoreColor = '#2ecc71';
+                    
+                    item.innerHTML = `
+                        <span class="top-rank">${index + 1}</span>
+                        <span class="top-name">${loc.name}</span>
+                        <span class="top-score" style="color: ${scoreColor}">${score}/100</span>
+                    `;
+                    topListDiv.appendChild(item);
+                });
+                
+            } catch (error) {
+                topListDiv.innerHTML = '<div class="loading">Error loading top locations</div>';
+            }
+        }
+        
+        // Load top locations on startup
+        showTopLocations('hybrid');
+    </script>
+</body>
+</html>
