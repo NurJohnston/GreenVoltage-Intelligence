@@ -1,31 +1,45 @@
 """
-TERRAVOLT INTELLIGENCE
+TERRAVOLT INTELLIGENCE - SOUTH AFRICA EDITION
 AI-Powered Geospatial Renewable Energy Optimization Platform
-MVP: Solar + Wind scoring for any location on Earth
+Focused on South African renewable energy potential
 """
 
 from flask import Flask, render_template, request, jsonify
 import requests
 import math
-import json
-from datetime import datetime, timedelta
+import numpy as np
 
 app = Flask(__name__)
 
+# South Africa bounds
+SA_BOUNDS = {
+    'min_lat': -35.0,
+    'max_lat': -22.0,
+    'min_lon': 16.0,
+    'max_lon': 33.0
+}
+
+# South Africa specific locations
+SA_LOCATIONS = [
+    {'name': 'Upington, Northern Cape', 'lat': -28.4, 'lon': 21.2, 'solar': 95, 'wind': 65},
+    {'name': 'Springbok, Northern Cape', 'lat': -29.7, 'lon': 17.9, 'solar': 94, 'wind': 70},
+    {'name': 'Cape Town, Western Cape', 'lat': -33.9, 'lon': 18.4, 'solar': 85, 'wind': 88},
+    {'name': 'Jeffreys Bay, Eastern Cape', 'lat': -34.0, 'lon': 24.9, 'solar': 82, 'wind': 92},
+    {'name': 'Richards Bay, KZN', 'lat': -28.8, 'lon': 32.1, 'solar': 88, 'wind': 75},
+    {'name': 'Beaufort West, Western Cape', 'lat': -32.4, 'lon': 22.6, 'solar': 92, 'wind': 80},
+    {'name': 'Kimberley, Northern Cape', 'lat': -28.7, 'lon': 24.8, 'solar': 93, 'wind': 68},
+    {'name': 'Port Elizabeth, Eastern Cape', 'lat': -34.0, 'lon': 25.6, 'solar': 84, 'wind': 86},
+    {'name': 'Mossel Bay, Western Cape', 'lat': -34.2, 'lon': 22.1, 'solar': 86, 'wind': 85},
+    {'name': 'Saldanha, Western Cape', 'lat': -33.0, 'lon': 17.9, 'solar': 87, 'wind': 89},
+]
+
 # ================================================================
-# SOLAR SCORE CALCULATION (NASA POWER API)
+# SOLAR SCORE CALCULATION (NASA POWER API - LIVE)
 # ================================================================
 
 def get_solar_score(lat, lon):
-    """
-    Calculate solar energy potential for a given location.
-    Uses NASA POWER API for solar irradiance data.
-    Returns score 0-100.
-    """
     try:
-        # NASA POWER API endpoint
-        url = f"https://power.larc.nasa.gov/api/temporal/daily/point"
-        
+        url = "https://power.larc.nasa.gov/api/temporal/daily/point"
         params = {
             'parameters': 'ALLSKY_SFC_SW_DWN',
             'community': 'RE',
@@ -35,46 +49,31 @@ def get_solar_score(lat, lon):
             'end': '20231231',
             'format': 'JSON'
         }
-        
         response = requests.get(url, params=params, timeout=30)
         data = response.json()
         
-        # Extract solar irradiance values (W/m²)
         solar_data = data['properties']['parameter']['ALLSKY_SFC_SW_DWN']
         values = list(solar_data.values())
         
         if not values:
-            return 50  # Default mid score if no data
+            return 50, 150
         
-        # Calculate average daily solar irradiance
         avg_irradiance = sum(values) / len(values)
-        
-        # Convert to score (0-100)
-        # Typical range: 50-300 W/m²
-        # 300+ W/m² = 100 score
-        # 50 W/m² = 0 score
         score = min(100, max(0, (avg_irradiance - 50) / 250 * 100))
-        
         return round(score, 1), avg_irradiance
         
     except Exception as e:
         print(f"Solar API error: {e}")
-        return 50, 150  # Default fallback
+        return 50, 150
 
 
 # ================================================================
-# WIND SCORE CALCULATION (Open-Meteo API)
+# WIND SCORE CALCULATION (Open-Meteo API - LIVE)
 # ================================================================
 
 def get_wind_score(lat, lon):
-    """
-    Calculate wind energy potential for a given location.
-    Uses Open-Meteo API for wind speed data.
-    Returns score 0-100.
-    """
     try:
-        url = f"https://archive-api.open-meteo.com/v1/archive"
-        
+        url = "https://archive-api.open-meteo.com/v1/archive"
         params = {
             'latitude': lat,
             'longitude': lon,
@@ -83,12 +82,11 @@ def get_wind_score(lat, lon):
             'hourly': 'wind_speed_10m',
             'timezone': 'auto'
         }
-        
         response = requests.get(url, params=params, timeout=30)
         data = response.json()
         
         if 'hourly' not in data:
-            return 50, 5  # Default fallback
+            return 50, 5
         
         wind_speeds = data['hourly']['wind_speed_10m']
         valid_speeds = [s for s in wind_speeds if s is not None]
@@ -97,13 +95,7 @@ def get_wind_score(lat, lon):
             return 50, 5
         
         avg_wind_speed = sum(valid_speeds) / len(valid_speeds)
-        
-        # Convert to score (0-100)
-        # Wind turbines need 4-5 m/s minimum
-        # 10+ m/s = 100 score
-        # 0 m/s = 0 score
         score = min(100, max(0, (avg_wind_speed - 3) / 12 * 100))
-        
         return round(score, 1), avg_wind_speed
         
     except Exception as e:
@@ -111,83 +103,32 @@ def get_wind_score(lat, lon):
         return 50, 5
 
 
-# ================================================================
-# HYBRID SCORE (Weighted combination)
-# ================================================================
+def get_hybrid_score(solar_score, wind_score):
+    return round((solar_score + wind_score) / 2, 1)
 
-def get_hybrid_score(solar_score, wind_score, solar_weight=0.5, wind_weight=0.5):
-    """
-    Calculate hybrid renewable energy score.
-    Default: 50% solar, 50% wind
-    """
-    hybrid = (solar_score * solar_weight) + (wind_score * wind_weight)
-    return round(hybrid, 1)
-
-
-# ================================================================
-# LOCATION NAME LOOKUP (Reverse geocoding)
-# ================================================================
 
 def get_location_name(lat, lon):
-    """Get location name from coordinates using Nominatim API"""
     try:
-        url = f"https://nominatim.openstreetmap.org/reverse"
-        params = {
-            'lat': lat,
-            'lon': lon,
-            'format': 'json',
-            'zoom': 10
-        }
-        headers = {
-            'User-Agent': 'TerraVolt-Intelligence/1.0'
-        }
+        url = "https://nominatim.openstreetmap.org/reverse"
+        params = {'lat': lat, 'lon': lon, 'format': 'json', 'zoom': 10}
+        headers = {'User-Agent': 'TerraVolt-Intelligence/1.0'}
         response = requests.get(url, params=params, headers=headers, timeout=10)
         data = response.json()
-        
         if 'display_name' in data:
-            # Extract city/region from full address
             parts = data['display_name'].split(',')
-            if len(parts) >= 2:
-                return parts[0].strip()
-            return parts[0].strip()
+            if 'South Africa' in data['display_name']:
+                return parts[0].strip() + ", South Africa"
+            return parts[0].strip() if len(parts) >= 2 else parts[0].strip()
         return f"{lat:.2f}, {lon:.2f}"
     except:
         return f"{lat:.2f}, {lon:.2f}"
 
 
-# ================================================================
-# TOP LOCATIONS (Precomputed best renewable energy sites)
-# ================================================================
-
 def get_top_locations(energy_type='hybrid', limit=10):
-    """
-    Return top locations for renewable energy.
-    Based on known ideal locations for solar/wind.
-    """
-    # Known optimal locations for renewable energy
-    locations = [
-        {'name': 'Sahara Desert, Africa', 'lat': 23.0, 'lon': 13.0, 'solar': 98, 'wind': 65},
-        {'name': 'Atacama Desert, Chile', 'lat': -24.5, 'lon': -69.0, 'solar': 97, 'wind': 60},
-        {'name': 'Gobi Desert, Asia', 'lat': 42.0, 'lon': 105.0, 'solar': 92, 'wind': 70},
-        {'name': 'North Sea, Europe', 'lat': 55.0, 'lon': 3.0, 'solar': 55, 'wind': 92},
-        {'name': 'Patagonia, Argentina', 'lat': -45.0, 'lon': -68.0, 'solar': 85, 'wind': 88},
-        {'name': 'Great Plains, USA', 'lat': 40.0, 'lon': -100.0, 'solar': 88, 'wind': 85},
-        {'name': 'Thar Desert, India', 'lat': 27.0, 'lon': 71.0, 'solar': 94, 'wind': 60},
-        {'name': 'Australian Outback', 'lat': -25.0, 'lon': 135.0, 'solar': 96, 'wind': 55},
-        {'name': 'Mojave Desert, USA', 'lat': 35.0, 'lon': -115.0, 'solar': 95, 'wind': 60},
-        {'name': 'South Africa Coast', 'lat': -34.0, 'lon': 22.0, 'solar': 88, 'wind': 82},
-        {'name': 'Mongolia Steppe', 'lat': 46.0, 'lon': 105.0, 'solar': 85, 'wind': 85},
-        {'name': 'Iceland', 'lat': 64.0, 'lon': -19.0, 'solar': 35, 'wind': 90},
-        {'name': 'British Coast, UK', 'lat': 55.0, 'lon': -5.0, 'solar': 45, 'wind': 88},
-        {'name': 'Horn of Africa', 'lat': 8.0, 'lon': 48.0, 'solar': 92, 'wind': 75},
-        {'name': 'Central Australia', 'lat': -22.0, 'lon': 140.0, 'solar': 95, 'wind': 60},
-    ]
-    
-    # Calculate hybrid scores
+    locations = SA_LOCATIONS.copy()
     for loc in locations:
         loc['hybrid'] = round((loc['solar'] + loc['wind']) / 2, 1)
     
-    # Sort by selected energy type
     if energy_type == 'solar':
         locations.sort(key=lambda x: x['solar'], reverse=True)
     elif energy_type == 'wind':
@@ -196,6 +137,40 @@ def get_top_locations(energy_type='hybrid', limit=10):
         locations.sort(key=lambda x: x['hybrid'], reverse=True)
     
     return locations[:limit]
+
+
+# ================================================================
+# SOUTH AFRICA HEATMAP ESTIMATION
+# ================================================================
+
+def estimate_solar_score_sa(lat, lon):
+    """Solar estimation specifically for South Africa"""
+    abs_lat = abs(lat)
+    # Northern Cape has best solar (around -28 to -30)
+    if -30 <= lat <= -28:
+        base = 95
+    elif lat < -30:
+        base = 85 - (abs_lat - 30) * 2
+    else:
+        base = 85 - (abs_lat - 28) * 1.5
+    return max(60, min(98, base))
+
+
+def estimate_wind_score_sa(lat, lon):
+    """Wind estimation specifically for South Africa"""
+    # Coastal areas have best wind
+    # Check if near coast (simplified)
+    is_coastal = (lon < 18.5 and lat > -34.5) or (lon > 25 and lat > -34) or (lat < -34)
+    
+    if is_coastal:
+        if -35 <= lat <= -33:
+            return 88 + (34 - abs(lat)) * 2
+        return 85
+    else:
+        # Inland areas
+        if -30 <= lat <= -28:
+            return 68
+        return 65
 
 
 # ================================================================
@@ -209,7 +184,6 @@ def index():
 
 @app.route('/api/analyze', methods=['POST'])
 def analyze():
-    """Analyze a location for renewable energy potential"""
     data = request.get_json()
     lat = data.get('lat')
     lon = data.get('lon')
@@ -217,27 +191,19 @@ def analyze():
     if lat is None or lon is None:
         return jsonify({'error': 'Missing coordinates'}), 400
     
-    # Get location name
     location_name = get_location_name(lat, lon)
-    
-    # Get solar score
     solar_score, solar_irradiance = get_solar_score(lat, lon)
-    
-    # Get wind score
     wind_score, wind_speed = get_wind_score(lat, lon)
-    
-    # Calculate hybrid score
     hybrid_score = get_hybrid_score(solar_score, wind_score)
     
-    # Determine recommendation
     if hybrid_score >= 80:
-        recommendation = "Excellent location for renewable energy!"
+        recommendation = "Excellent location for renewable energy in South Africa!"
     elif hybrid_score >= 65:
-        recommendation = "Good potential for renewable energy."
+        recommendation = "Good potential for renewable energy in South Africa."
     elif hybrid_score >= 50:
         recommendation = "Moderate potential. Consider hybrid system."
     else:
-        recommendation = "Limited potential. May not be economically viable."
+        recommendation = "Limited potential. Consider other regions in SA."
     
     return jsonify({
         'location': location_name,
@@ -254,37 +220,134 @@ def analyze():
 
 @app.route('/api/top', methods=['GET'])
 def top_locations():
-    """Get top locations for renewable energy"""
     energy_type = request.args.get('type', 'hybrid')
     limit = int(request.args.get('limit', 10))
-    
     locations = get_top_locations(energy_type, limit)
+    return jsonify({'energy_type': energy_type, 'count': len(locations), 'locations': locations})
+
+
+@app.route('/api/heatmap', methods=['POST'])
+def generate_heatmap():
+    data = request.get_json()
+    bounds = data.get('bounds')
+    energy_type = data.get('type', 'hybrid')
+    resolution = data.get('resolution', 30)
     
-    return jsonify({
-        'energy_type': energy_type,
-        'count': len(locations),
-        'locations': locations
-    })
+    lat_step = (bounds['north'] - bounds['south']) / resolution
+    lon_step = (bounds['east'] - bounds['west']) / resolution
+    
+    heatmap_data = []
+    
+    for i in range(resolution):
+        lat = bounds['south'] + i * lat_step
+        for j in range(resolution):
+            lon = bounds['west'] + j * lon_step
+            
+            if energy_type == 'solar':
+                score = estimate_solar_score_sa(lat, lon)
+            elif energy_type == 'wind':
+                score = estimate_wind_score_sa(lat, lon)
+            else:
+                score = (estimate_solar_score_sa(lat, lon) + estimate_wind_score_sa(lat, lon)) / 2
+            
+            heatmap_data.append({
+                'lat': round(lat, 4),
+                'lon': round(lon, 4),
+                'intensity': round(score / 100, 3)
+            })
+    
+    return jsonify({'data': heatmap_data})
+
+
+@app.route('/api/hotspots', methods=['POST'])
+def find_hotspots():
+    data = request.get_json()
+    bounds = data.get('bounds')
+    energy_type = data.get('type', 'hybrid')
+    min_score = data.get('min_score', 70)
+    
+    # Scan SA grid
+    resolution = 0.5
+    lat_grid = np.arange(max(-35, bounds['min_lat']), min(-22, bounds['max_lat']), resolution)
+    lon_grid = np.arange(max(16, bounds['min_lon']), min(33, bounds['max_lon']), resolution)
+    
+    high_potential = []
+    
+    for lat in lat_grid:
+        for lon in lon_grid:
+            if energy_type == 'solar':
+                score = estimate_solar_score_sa(lat, lon)
+            elif energy_type == 'wind':
+                score = estimate_wind_score_sa(lat, lon)
+            else:
+                score = (estimate_solar_score_sa(lat, lon) + estimate_wind_score_sa(lat, lon)) / 2
+            
+            if score >= min_score:
+                high_potential.append({'lat': lat, 'lon': lon, 'score': score})
+    
+    # Group nearby points into clusters
+    hotspots = []
+    used = set()
+    
+    for i, point in enumerate(high_potential):
+        if i in used:
+            continue
+        
+        cluster = [point]
+        cluster_indices = [i]
+        
+        for j, other in enumerate(high_potential):
+            if j != i and j not in used:
+                dist = math.sqrt((point['lat'] - other['lat'])**2 + (point['lon'] - other['lon'])**2)
+                if dist < 1.5:
+                    cluster.append(other)
+                    cluster_indices.append(j)
+        
+        if len(cluster) >= 2:
+            avg_lat = sum(p['lat'] for p in cluster) / len(cluster)
+            avg_lon = sum(p['lon'] for p in cluster) / len(cluster)
+            avg_score = sum(p['score'] for p in cluster) / len(cluster)
+            radius_km = len(cluster) * 55
+            
+            hotspots.append({
+                'center_lat': round(avg_lat, 2),
+                'center_lon': round(avg_lon, 2),
+                'radius_km': round(radius_km, 0),
+                'intensity': round(avg_score, 1),
+                'area_km2': round(3.14 * radius_km ** 2, 0)
+            })
+            
+            for idx in cluster_indices:
+                used.add(idx)
+    
+    hotspots.sort(key=lambda x: x['intensity'], reverse=True)
+    
+    return jsonify({'hotspots': hotspots[:10], 'count': len(hotspots)})
 
 
 @app.route('/api/health', methods=['GET'])
 def health():
-    """Health check endpoint"""
     return jsonify({
         'status': 'operational',
-        'version': '1.0.0',
-        'name': 'TerraVolt Intelligence'
+        'version': '2.0.0-south-africa',
+        'name': 'TerraVolt Intelligence - South Africa Edition',
+        'bounds': SA_BOUNDS
     })
 
 
 if __name__ == '__main__':
     print("=" * 60)
-    print("🌍 TERRAVOLT INTELLIGENCE")
+    print("🌍 TERRAVOLT INTELLIGENCE - SOUTH AFRICA EDITION")
     print("=" * 60)
     print("\n📍 Server running at: http://127.0.0.1:5000")
-    print("📡 API endpoints:")
-    print("   POST /api/analyze - Analyze location")
-    print("   GET  /api/top     - Top locations")
-    print("   GET  /api/health  - Health check")
+    print("📡 Focused on South African renewable energy potential")
+    print(f"📍 Map bounds: {SA_BOUNDS}")
+    print("\n📡 API endpoints:")
+    print("   POST /api/analyze - Analyze SA location")
+    print("   GET  /api/top     - Top SA locations")
+    print("   POST /api/heatmap - Generate SA heatmap")
+    print("   POST /api/hotspots - Find SA hotspots")
+    print("\n✅ Using live API data for point analysis")
+    print("✅ Using SA-specific estimation for heatmap")
     print("\nPress Ctrl+C to stop\n")
     app.run(debug=True, port=5000)
