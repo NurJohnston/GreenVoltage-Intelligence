@@ -69,7 +69,9 @@ def get_solar_score(lat, lon):
             return None, None
         
         avg_irradiance = sum(values) / len(values)
-        score = min(100, max(0, (avg_irradiance - 50) / 250 * 100))
+        avg_irradiance = avg_irradiance * 11.574  # convert MJ/m²/day to W/m²
+        #score = min(100, max(0, (avg_irradiance - 50) / 250 * 100))
+        score = min(100, max(0, (avg_irradiance - 289) / 988 * 100))
         return round(score, 1), avg_irradiance
         
     except Exception as e:
@@ -91,6 +93,7 @@ def get_wind_score(lat, lon):
             'start_date': '2023-01-01',
             'end_date': '2023-12-31',
             'hourly': 'wind_speed_10m',
+            'wind_speed_unit': 'ms',
             'timezone': 'auto'
         }
         response = requests.get(url, params=params, timeout=15)
@@ -106,7 +109,8 @@ def get_wind_score(lat, lon):
             return None, None
         
         avg_wind_speed = sum(valid_speeds) / len(valid_speeds)
-        score = min(100, max(0, (avg_wind_speed - 3) / 12 * 100))
+        #score = min(100, max(0, (avg_wind_speed - 3) / 12 * 100))
+        score = min(100, max(0, (avg_wind_speed - 2.9) / (14.9 - 2.9) * 100))
         return round(score, 1), avg_wind_speed
         
     except Exception as e:
