@@ -19,8 +19,10 @@ class RenewableEnergyPredictor:
     
     def load_models(self):
         """Load trained models from disk"""
-        solar_path = Path('solar_model.pkl')
-        wind_path = Path('wind_model.pkl')
+        #solar_path = Path('solar_model.pkl')
+        solar_path = Path(__file__).parent / 'solar_model.pkl'
+        #wind_path = Path('wind_model.pkl')
+        wind_path = Path(__file__).parent / 'wind_model.pkl'
         
         if solar_path.exists():
             self.solar_model = joblib.load(solar_path)
@@ -191,7 +193,8 @@ class RenewableEnergyPredictor:
             date = datetime.now()
         
         features = self._create_prediction_features(lat, lon, date)
-        features_array = np.array([features])
+        #features_array = np.array([features])
+        features_array = features
         
         # Get predictions with confidence (using tree variance for RF)
         solar_pred = 0
@@ -210,8 +213,9 @@ class RenewableEnergyPredictor:
                 solar_std = solar_pred * 0.1  # Assume 10% uncertainty
         
         if self.wind_model:
-            if hasattr(self.wind_model, 'estimators_'):
-                predictions = [tree.predict(features_array)[0] for tree in self.wind_model.estimators_]
+            #if hasattr(self.wind_model, 'estimators_'):
+            #    predictions = [tree.predict(features_array)[0] for tree in self.wind_model.estimators_]
+            if hasattr(self.wind_model, 'estimators_') and hasattr(self.wind_model.estimators_[0], 'predict'):
                 wind_pred = np.mean(predictions)
                 wind_std = np.std(predictions)
             else:
@@ -219,8 +223,12 @@ class RenewableEnergyPredictor:
                 wind_std = wind_pred * 0.15
         
         # Convert to scores
-        solar_score = min(100, max(0, (solar_pred - 50) / 250 * 100))
-        wind_score = min(100, max(0, (wind_pred - 10) / 500 * 100))
+        #solar_score = min(100, max(0, (solar_pred - 50) / 250 * 100))
+        #solar_score = min(100, max(0, (solar_pred - 100) / 900 * 100))
+        solar_score = min(100, max(0, (solar_pred - 289) / 988 * 100))
+        #wind_score = min(100, max(0, (wind_pred - 10) / 500 * 100))
+        #wind_score = min(100, max(0, (wind_pred - 10) / 800 * 100))
+        wind_score = min(100, max(0, (wind_pred - 14) / (2028 - 14) * 100))
         
         return {
             'solar': round(solar_score, 1),
@@ -257,14 +265,30 @@ class RenewableEnergyPredictor:
         lat_rad = np.radians(lat)
         lon_rad = np.radians(lon)
         
-        return [
+        #return [
+        #    np.sin(lat_rad), np.cos(lat_rad),
+        #    np.sin(lon_rad), np.cos(lon_rad),
+        #    np.sin(2 * np.pi * month / 12),
+        #    np.cos(2 * np.pi * month / 12),
+        #    day_of_year
+        #]
+
+        #return pd.DataFrame([[
+        #    np.sin(lat_rad), np.cos(lat_rad),
+        #    np.sin(lon_rad), np.cos(lon_rad),
+        #    np.sin(2 * np.pi * month / 12),
+        #    np.cos(2 * np.pi * month / 12),
+        #    day_of_year
+        #]], columns=['lat_sin', 'lat_cos', 'lon_sin', 'lon_cos', 'month_sin', 'month_cos', 'day_of_year'])
+        
+        return np.array([[
             np.sin(lat_rad), np.cos(lat_rad),
             np.sin(lon_rad), np.cos(lon_rad),
             np.sin(2 * np.pi * month / 12),
             np.cos(2 * np.pi * month / 12),
             day_of_year
-        ]
-    
+        ]])   
+
     def find_hotspots(self, bounds, energy_type='hybrid', resolution=0.5):
         """Find clusters of high renewable energy potential"""
         lat_grid = np.arange(bounds['min_lat'], bounds['max_lat'], resolution)

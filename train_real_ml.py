@@ -30,6 +30,9 @@ wind_df = pd.read_sql(wind_query.statement, engine)
 print(f"\n✅ Loaded {len(solar_df)} solar records")
 print(f"✅ Loaded {len(wind_df)} wind records")
 
+solar_df = solar_df[solar_df['irradiance'].notna() & (solar_df['irradiance'] > 0)]
+wind_df = wind_df[wind_df['wind_power_density'].notna() & (wind_df['wind_power_density'] > 0)]
+
 if len(solar_df) == 0 or len(wind_df) == 0:
     print("\n❌ No data found! Run data_collector.py first.")
     exit()
@@ -63,7 +66,8 @@ def engineer_features(df, target_col):
     features = ['lat_sin', 'lat_cos', 'lon_sin', 'lon_cos', 
                 'month_sin', 'month_cos', 'day_of_year']
     
-    X = df[features]
+    #X = df[features]
+    X = df[features].values
     y = df[target_col]
     
     return X, y
@@ -162,8 +166,11 @@ def predict_location(lat, lon, month=1, day=15):
     solar_pred = solar_model.predict(features)[0]
     wind_pred = wind_model.predict(features)[0]
     
-    solar_score = min(100, max(0, (solar_pred - 50) / 250 * 100))
-    wind_score = min(100, max(0, (wind_pred - 10) / 500 * 100))
+    #solar_score = min(100, max(0, (solar_pred - 50) / 250 * 100))
+    solar_score = min(100, max(0, (solar_pred - 289) / 988 * 100))
+    #wind_score = min(100, max(0, (wind_pred - 10) / 500 * 100))
+    wind_score = min(100, max(0, (wind_pred - 14) / 2014 * 100))
+    
     
     print(f"  Solar: {solar_score:.1f}/100 ({solar_pred:.1f} W/m²)")
     print(f"  Wind: {wind_score:.1f}/100 ({wind_pred:.1f} W/m²)")
