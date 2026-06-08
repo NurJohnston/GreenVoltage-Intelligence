@@ -225,10 +225,12 @@ class RenewableEnergyPredictor:
         # Convert to scores
         #solar_score = min(100, max(0, (solar_pred - 50) / 250 * 100))
         #solar_score = min(100, max(0, (solar_pred - 100) / 900 * 100))
-        solar_score = min(100, max(0, (solar_pred - 289) / 988 * 100))
+        #solar_score = min(100, max(0, (solar_pred - 289) / 988 * 100))
+        solar_score = min(100, max(0, (solar_pred - 200) / 800 * 100))
         #wind_score = min(100, max(0, (wind_pred - 10) / 500 * 100))
         #wind_score = min(100, max(0, (wind_pred - 10) / 800 * 100))
-        wind_score = min(100, max(0, (wind_pred - 14) / (2028 - 14) * 100))
+        #wind_score = min(100, max(0, (wind_pred - 14) / (2028 - 14) * 100))
+        wind_score = min(100, max(0, (wind_pred - 50) / 500 * 100))
         
         return {
             'solar': round(solar_score, 1),
