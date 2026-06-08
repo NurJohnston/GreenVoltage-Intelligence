@@ -8,6 +8,7 @@
     <link rel="stylesheet" href="https://unpkg.com/leaflet.heat/dist/leaflet-heat.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://unpkg.com/leaflet.heat/dist/leaflet-heat.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <style>
         * {
             margin: 0;
@@ -31,25 +32,33 @@
             justify-content: space-between;
             align-items: center;
             border-bottom: 1px solid #2ecc71;
+            flex-wrap: wrap;
+            gap: 10px;
         }
         
         .logo h1 {
-            font-size: 1.5rem;
+            font-size: 1.3rem;
             letter-spacing: 2px;
         }
         
         .logo p {
-            font-size: 0.75rem;
+            font-size: 0.7rem;
             color: #2ecc71;
+        }
+        
+        .nav {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
         }
         
         .nav a {
             color: white;
             text-decoration: none;
-            margin-left: 20px;
-            padding: 8px 16px;
+            padding: 6px 12px;
             border-radius: 5px;
             transition: background 0.2s;
+            font-size: 0.9rem;
         }
         
         .nav a:hover {
@@ -60,12 +69,13 @@
         .main {
             flex: 1;
             display: flex;
+            min-height: 0;
         }
         
         .sidebar {
-            width: 350px;
+            width: 380px;
             background: #1a1a3a;
-            padding: 20px;
+            padding: 15px;
             overflow-y: auto;
             border-right: 1px solid #2ecc71;
         }
@@ -82,41 +92,32 @@
         .info-card {
             background: #0a0a2a;
             border-radius: 10px;
-            padding: 15px;
-            margin-bottom: 20px;
+            padding: 12px;
+            margin-bottom: 15px;
             border: 1px solid #2ecc71;
         }
         
         .info-card h3 {
             color: #2ecc71;
             margin-bottom: 10px;
+            font-size: 1rem;
         }
-        
-        .score {
-            font-size: 2rem;
-            font-weight: bold;
-            text-align: center;
-            margin: 10px 0;
-        }
-        
-        .score-solar { color: #f39c12; }
-        .score-wind { color: #3498db; }
-        .score-hybrid { color: #2ecc71; }
         
         .metric {
             display: flex;
             justify-content: space-between;
-            margin: 8px 0;
-            padding: 5px 0;
+            margin: 6px 0;
+            padding: 4px 0;
             border-bottom: 1px solid #2a2a4a;
+            font-size: 0.9rem;
         }
         
         .recommendation {
             background: #1a2a1a;
-            padding: 10px;
+            padding: 8px;
             border-radius: 8px;
             margin-top: 10px;
-            font-size: 0.9rem;
+            font-size: 0.85rem;
         }
         
         .loading {
@@ -126,17 +127,18 @@
         }
         
         .top-list {
-            max-height: 300px;
+            max-height: 250px;
             overflow-y: auto;
         }
         
         .top-item {
             display: flex;
             justify-content: space-between;
-            padding: 8px;
+            padding: 6px;
             border-bottom: 1px solid #2a2a4a;
             cursor: pointer;
             transition: background 0.2s;
+            font-size: 0.85rem;
         }
         
         .top-item:hover {
@@ -161,11 +163,12 @@
             background: #2ecc71;
             color: #0a0a2a;
             border: none;
-            padding: 8px 16px;
+            padding: 6px 12px;
             border-radius: 5px;
             cursor: pointer;
             width: 100%;
-            margin-top: 10px;
+            margin-top: 8px;
+            font-size: 0.85rem;
         }
         
         button:hover {
@@ -174,59 +177,115 @@
         
         select {
             width: 100%;
-            padding: 8px;
-            margin: 10px 0;
+            padding: 6px;
+            margin: 8px 0;
             background: #1a1a3a;
             color: white;
             border: 1px solid #2ecc71;
             border-radius: 5px;
+            font-size: 0.85rem;
         }
         
         .attribution {
-            font-size: 0.7rem;
+            font-size: 0.65rem;
             text-align: center;
-            padding: 10px;
+            padding: 8px;
             background: #0a0a2a;
             border-top: 1px solid #2ecc71;
         }
         
         .heatmap-controls {
-            margin-top: 10px;
-            padding: 10px;
+            margin-top: 8px;
+            padding: 8px;
             background: #1a1a3a;
             border-radius: 5px;
         }
         
-        .heatmap-controls select, 
-        .heatmap-controls button {
-            margin: 5px 0;
-        }
-        
         .legend {
             background: rgba(0,0,0,0.8);
-            padding: 8px;
+            padding: 6px;
             border-radius: 5px;
-            font-size: 12px;
+            font-size: 10px;
         }
         
         .legend-color {
-            width: 20px;
-            height: 20px;
+            width: 16px;
+            height: 16px;
             display: inline-block;
             margin-right: 5px;
+        }
+        
+        .badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 0.7rem;
+            font-weight: bold;
+        }
+        
+        .badge-live {
+            background: #2ecc71;
+            color: #0a0a2a;
+        }
+        
+        .badge-ml {
+            background: #f39c12;
+            color: #0a0a2a;
+        }
+        
+        .confidence-bar {
+            height: 4px;
+            background: #2a2a4a;
+            border-radius: 2px;
+            margin-top: 4px;
+            overflow: hidden;
+        }
+        
+        .confidence-fill {
+            height: 100%;
+            background: #2ecc71;
+            border-radius: 2px;
+            transition: width 0.3s;
+        }
+        
+        .score-number {
+            font-size: 1.3rem;
+            font-weight: bold;
+        }
+        
+        .score-solar { color: #f39c12; }
+        .score-wind { color: #3498db; }
+        .score-hybrid { color: #2ecc71; }
+        
+        #forecastChart {
+            max-height: 180px;
+        }
+        
+        /* Scrollbar styling */
+        .sidebar::-webkit-scrollbar {
+            width: 6px;
+        }
+        
+        .sidebar::-webkit-scrollbar-track {
+            background: #1a1a3a;
+        }
+        
+        .sidebar::-webkit-scrollbar-thumb {
+            background: #2ecc71;
+            border-radius: 3px;
         }
     </style>
 </head>
 <body>
     <div class="header">
         <div class="logo">
-            <h1>🇿🇦 TERRAVOLT INTELLIGENCE - SA EDITION</h1>
+            <h1>🇿🇦 TERRAVOLT INTELLIGENCE</h1>
             <p>AI-Powered South African Renewable Energy Optimization</p>
         </div>
         <div class="nav">
-            <a href="#" onclick="showTopLocations('hybrid')">Top Hybrid</a>
-            <a href="#" onclick="showTopLocations('solar')">Top Solar</a>
-            <a href="#" onclick="showTopLocations('wind')">Top Wind</a>
+            <a href="#" onclick="showTopLocations('hybrid')">🏆 Top Hybrid</a>
+            <a href="#" onclick="showTopLocations('solar')">☀️ Top Solar</a>
+            <a href="#" onclick="showTopLocations('wind')">💨 Top Wind</a>
         </div>
     </div>
 
@@ -234,17 +293,17 @@
         <div class="sidebar">
             <div class="info-card">
                 <h3>📍 Click on Map</h3>
-                <p>Select any location in South Africa to analyze renewable energy potential.</p>
+                <p style="font-size: 0.85rem;">Select any location in South Africa to analyze renewable energy potential with live data + ML predictions.</p>
             </div>
             
             <div id="results" style="display: none;">
                 <div class="info-card">
-                    <h3>📊 Energy Analysis</h3>
-                    <div id="location-name" style="color: #2ecc71; margin-bottom: 10px;"></div>
+                    <h3>📊 Live Energy Analysis</h3>
+                    <div id="location-name" style="color: #2ecc71; margin-bottom: 8px; font-size: 0.9rem;"></div>
                     
                     <div class="metric">
                         <span>☀️ Solar Score:</span>
-                        <span id="solar-score" class="score-solar">-</span>
+                        <span id="solar-score" class="score-solar score-number">-</span>
                     </div>
                     <div class="metric">
                         <span>Solar Irradiance:</span>
@@ -253,7 +312,7 @@
                     
                     <div class="metric">
                         <span>💨 Wind Score:</span>
-                        <span id="wind-score" class="score-wind">-</span>
+                        <span id="wind-score" class="score-wind score-number">-</span>
                     </div>
                     <div class="metric">
                         <span>Wind Speed:</span>
@@ -262,19 +321,52 @@
                     
                     <div class="metric">
                         <span>⚡ Hybrid Score:</span>
-                        <span id="hybrid-score" class="score-hybrid">-</span>
+                        <span id="hybrid-score" class="score-hybrid score-number">-</span>
                     </div>
                     
                     <div id="recommendation" class="recommendation"></div>
+                </div>
+                
+                <!-- ML Comparison Panel -->
+                <div class="info-card" id="ml-comparison" style="display: none;">
+                    <h3>🧠 ML Prediction</h3>
+                    <div class="metric">
+                        <span>ML Solar:</span>
+                        <span id="ml-solar" class="score-solar">-</span>
+                    </div>
+                    <div class="confidence-bar">
+                        <div id="ml-solar-confidence" class="confidence-fill" style="width: 0%"></div>
+                    </div>
+                    <div class="metric">
+                        <span>ML Wind:</span>
+                        <span id="ml-wind" class="score-wind">-</span>
+                    </div>
+                    <div class="confidence-bar">
+                        <div id="ml-wind-confidence" class="confidence-fill" style="width: 0%"></div>
+                    </div>
+                    <div class="metric">
+                        <span>ML Hybrid:</span>
+                        <span id="ml-hybrid" class="score-hybrid">-</span>
+                    </div>
+                    <div class="metric">
+                        <span>Data Source:</span>
+                        <span id="data-source-badge"></span>
+                    </div>
+                </div>
+                
+                <!-- Forecast Section -->
+                <div class="info-card" id="forecast-section" style="display: none;">
+                    <h3>📈 12-Month ML Forecast</h3>
+                    <canvas id="forecastChart" height="180"></canvas>
                 </div>
             </div>
             
             <div class="info-card">
                 <h3>🏆 Top SA Locations</h3>
-                <div style="display: flex; gap: 10px; margin-bottom: 10px;">
-                    <button onclick="showTopLocations('hybrid')" style="margin: 0;">Hybrid</button>
-                    <button onclick="showTopLocations('solar')" style="margin: 0;">Solar</button>
-                    <button onclick="showTopLocations('wind')" style="margin: 0;">Wind</button>
+                <div style="display: flex; gap: 8px; margin-bottom: 8px;">
+                    <button onclick="showTopLocations('hybrid')" style="margin: 0; flex: 1;">Hybrid</button>
+                    <button onclick="showTopLocations('solar')" style="margin: 0; flex: 1;">Solar</button>
+                    <button onclick="showTopLocations('wind')" style="margin: 0; flex: 1;">Wind</button>
                 </div>
                 <div id="top-list" class="top-list">
                     <div class="loading">Loading top locations...</div>
@@ -289,8 +381,9 @@
                         <option value="solar">Solar Only</option>
                         <option value="wind">Wind Only</option>
                     </select>
-                    <button onclick="toggleHeatmap()">🌡️ Toggle Heatmap</button>
+                    <button onclick="toggleHeatmap()">🌡️ Show Heatmap</button>
                     <button onclick="findHotspots()">⭐ Find Hotspots</button>
+                    <button onclick="clearHotspots()">🗑️ Clear Hotspots</button>
                 </div>
             </div>
         </div>
@@ -301,7 +394,7 @@
     </div>
     
     <div class="attribution">
-        Data sources: NASA POWER (Solar) | Open-Meteo (Wind) | OpenStreetMap (Map) | Focus: South Africa
+        📡 Live Data: NASA POWER (Solar) | Open-Meteo (Wind) | 🧠 ML Models: Trained on SA data | 🗺️ Map: OpenStreetMap
     </div>
     
     <script>
@@ -319,9 +412,12 @@
                 L.latLng(SA_BOUNDS.minLat, SA_BOUNDS.minLon),
                 L.latLng(SA_BOUNDS.maxLat, SA_BOUNDS.maxLon)
             ),
-            maxBoundsViscosity: 1.0,
+            maxBoundsViscosity: 0.8,
             minZoom: 5,
-            maxZoom: 10
+            maxZoom: 9,
+            zoomSnap: 0.5,
+            zoomDelta: 0.5,
+            wheelPxPerZoomLevel: 80
         }).setView([-29.0, 24.5], 6);
         
         L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
@@ -333,16 +429,21 @@
         
         var currentMarker = null;
         var heatmapLayer = null;
+        var hotspotMarkers = [];
         var currentEnergyType = 'hybrid';
+        var forecastChart = null;
         
         async function analyzeLocation(lat, lon) {
             const resultsDiv = document.getElementById('results');
             resultsDiv.style.display = 'block';
             
+            // Show loading state
             document.getElementById('solar-score').innerHTML = '...';
             document.getElementById('wind-score').innerHTML = '...';
             document.getElementById('hybrid-score').innerHTML = '...';
             document.getElementById('location-name').innerHTML = 'Analyzing...';
+            document.getElementById('ml-comparison').style.display = 'none';
+            document.getElementById('forecast-section').style.display = 'none';
             
             try {
                 const response = await fetch('/api/analyze', {
@@ -355,6 +456,7 @@
                 
                 const data = await response.json();
                 
+                // Update live data section
                 document.getElementById('location-name').innerHTML = `📍 ${data.location}`;
                 document.getElementById('solar-score').innerHTML = `${data.solar_score}/100`;
                 document.getElementById('solar-irradiance').innerHTML = `${data.solar_irradiance} W/m²`;
@@ -363,14 +465,108 @@
                 document.getElementById('hybrid-score').innerHTML = `${data.hybrid_score}/100`;
                 document.getElementById('recommendation').innerHTML = data.recommendation;
                 
+                // Show ML comparison if available
+                if (data.ml_scores) {
+                    document.getElementById('ml-comparison').style.display = 'block';
+                    document.getElementById('ml-solar').innerHTML = `${data.ml_scores.solar}/100`;
+                    document.getElementById('ml-wind').innerHTML = `${data.ml_scores.wind}/100`;
+                    document.getElementById('ml-hybrid').innerHTML = `${data.ml_scores.hybrid}/100`;
+                    
+                    // Update confidence bars
+                    const solarConfidence = document.getElementById('ml-solar-confidence');
+                    const windConfidence = document.getElementById('ml-wind-confidence');
+                    solarConfidence.style.width = `${data.ml_scores.solar_confidence || 85}%`;
+                    windConfidence.style.width = `${data.ml_scores.wind_confidence || 85}%`;
+                    
+                    // Data source badge
+                    const badgeSpan = document.getElementById('data-source-badge');
+                    if (data.data_source === 'live') {
+                        badgeSpan.innerHTML = '<span class="badge badge-live">🟢 LIVE API</span>';
+                    } else {
+                        badgeSpan.innerHTML = '<span class="badge badge-ml">🧠 ML FALLBACK</span>';
+                    }
+                }
+                
+                // Show forecast if available
+                if (data.forecast && data.forecast.length) {
+                    document.getElementById('forecast-section').style.display = 'block';
+                    renderForecastChart(data.forecast);
+                }
+                
             } catch (error) {
                 console.error('Error:', error);
-                document.getElementById('location-name').innerHTML = 'Error analyzing location';
+                document.getElementById('location-name').innerHTML = '❌ Error analyzing location';
                 document.getElementById('solar-score').innerHTML = 'Error';
                 document.getElementById('wind-score').innerHTML = 'Error';
                 document.getElementById('hybrid-score').innerHTML = 'Error';
-                document.getElementById('recommendation').innerHTML = 'Failed to fetch data. Please try again.';
+                document.getElementById('recommendation').innerHTML = 'Failed to fetch data. Please check if the server is running.';
             }
+        }
+        
+        function renderForecastChart(forecast) {
+            const ctx = document.getElementById('forecastChart').getContext('2d');
+            
+            if (forecastChart) {
+                forecastChart.destroy();
+            }
+            
+            forecastChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: forecast.map(f => f.month),
+                    datasets: [
+                        {
+                            label: 'Solar Score',
+                            data: forecast.map(f => f.solar),
+                            backgroundColor: 'rgba(243, 156, 18, 0.7)',
+                            borderColor: '#f39c12',
+                            borderWidth: 1,
+                            borderRadius: 4
+                        },
+                        {
+                            label: 'Wind Score',
+                            data: forecast.map(f => f.wind),
+                            backgroundColor: 'rgba(52, 152, 219, 0.7)',
+                            borderColor: '#3498db',
+                            borderWidth: 1,
+                            borderRadius: 4
+                        },
+                        {
+                            label: 'Hybrid Score',
+                            data: forecast.map(f => f.hybrid),
+                            backgroundColor: 'rgba(46, 204, 113, 0.7)',
+                            borderColor: '#2ecc71',
+                            borderWidth: 1,
+                            borderRadius: 4
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    plugins: {
+                        legend: { 
+                            position: 'top', 
+                            labels: { color: 'white', font: { size: 10 } },
+                            title: { display: false }
+                        },
+                        tooltip: { mode: 'index', intersect: false }
+                    },
+                    scales: {
+                        y: { 
+                            min: 0, 
+                            max: 100, 
+                            grid: { color: '#2a2a4a' },
+                            title: { display: true, text: 'Score (0-100)', color: 'white', font: { size: 10 } },
+                            ticks: { color: 'white', stepSize: 25 }
+                        },
+                        x: { 
+                            ticks: { color: 'white', maxRotation: 45, minRotation: 45, font: { size: 8 } },
+                            grid: { display: false }
+                        }
+                    }
+                }
+            });
         }
         
         map.on('click', function(e) {
@@ -382,7 +578,7 @@
             }
             
             currentMarker = L.marker([lat, lon]).addTo(map);
-            currentMarker.bindPopup(`📍 Analyzing location...`).openPopup();
+            currentMarker.bindPopup(`📍 <b>Analyzing location...</b><br>Lat: ${lat.toFixed(4)}<br>Lon: ${lon.toFixed(4)}`).openPopup();
             
             analyzeLocation(lat, lon);
             
@@ -437,6 +633,7 @@
                 
             } catch (error) {
                 topListDiv.innerHTML = '<div class="loading">Error loading top locations</div>';
+                console.error('Error loading top locations:', error);
             }
         }
         
@@ -468,7 +665,7 @@
                         west: bounds.getWest()
                     },
                     type: heatmapType,
-                    resolution: 40
+                    resolution: 30
                 })
             });
             
@@ -485,8 +682,8 @@
             }
             
             heatmapLayer = L.heatLayer(heatPoints, {
-                radius: 25,
-                blur: 20,
+                radius: 20,
+                blur: 15,
                 maxZoom: 8,
                 minOpacity: 0.4,
                 gradient: {
@@ -501,7 +698,16 @@
             addHeatmapLegend();
         }
         
+        function clearHotspots() {
+            hotspotMarkers.forEach(marker => {
+                map.removeLayer(marker);
+            });
+            hotspotMarkers = [];
+        }
+        
         async function findHotspots() {
+            clearHotspots();
+            
             const bounds = map.getBounds();
             const heatmapType = document.getElementById('heatmap-type').value;
             
@@ -523,12 +729,11 @@
                 
                 const data = await response.json();
                 
-                if (data.count === 0) {
+                if (!data.hotspots || data.hotspots.length === 0) {
                     alert('No hotspots found in this area. Try zooming out or changing energy type.');
                 } else {
-                    alert(`Found ${data.count} renewable energy hotspots in South Africa!`);
+                    alert(`🔥 Found ${data.hotspots.length} renewable energy hotspots in South Africa!`);
                 }
-                console.log('Hotspots:', data.hotspots);
                 
                 data.hotspots.forEach(hotspot => {
                     const marker = L.marker([hotspot.center_lat, hotspot.center_lon])
@@ -536,21 +741,25 @@
                             <b>🔥 SA Renewable Hotspot</b><br>
                             <b>${heatmapType.toUpperCase()} Score:</b> ${hotspot.intensity}/100<br>
                             <b>Area:</b> ${Math.round(hotspot.area_km2).toLocaleString()} km²<br>
+                            <b>Points:</b> ${hotspot.point_count || 'N/A'}<br>
                             ⚡ Excellent potential for ${heatmapType} energy!
                         `)
                         .addTo(map);
                     
-                    L.circle([hotspot.center_lat, hotspot.center_lon], {
-                        radius: Math.min(hotspot.radius_km * 1000, 200000),
+                    const circle = L.circle([hotspot.center_lat, hotspot.center_lon], {
+                        radius: Math.min(hotspot.radius_km * 1000, 150000),
                         color: '#e74c3c',
                         fillColor: '#e74c3c',
                         fillOpacity: 0.1,
                         weight: 2
                     }).addTo(map);
+                    
+                    hotspotMarkers.push(marker, circle);
                 });
+                
             } catch (error) {
                 console.error('Error finding hotspots:', error);
-                alert('Hotspot detection error. Please try again.');
+                alert('Hotspot detection error. Please check if the server is running.');
             }
         }
         
@@ -564,12 +773,12 @@
                 const div = L.DomUtil.create('div', 'heatmap-legend');
                 div.innerHTML = `
                     <div class="legend">
-                        <strong>🇿🇦 ${currentEnergyType.toUpperCase()} Potential</strong><br>
-                        <div><span class="legend-color" style="background:#3498db"></span> Low (0-20)</div>
+                        <strong>🇿🇦 ML-Based ${currentEnergyType.toUpperCase()} Potential</strong><br>
+                        <div><span class="legend-color" style="background:#3498db"></span> Low (0-40)</div>
                         <div><span class="legend-color" style="background:#2ecc71"></span> Medium (40-60)</div>
                         <div><span class="legend-color" style="background:#f39c12"></span> High (60-80)</div>
                         <div><span class="legend-color" style="background:#e74c3c"></span> Very High (80-100)</div>
-                        <small>Based on SA-specific data</small>
+                        <small>Based on ML model predictions</small>
                     </div>
                 `;
                 return div;
@@ -584,7 +793,16 @@
             }
         });
         
+        // Initial load
         showTopLocations('hybrid');
+        
+        // Add loading indicator removal
+        window.addEventListener('load', () => {
+            console.log('TerraVolt Intelligence - SA Edition Loaded');
+            console.log('📍 Map bounds locked to South Africa');
+            console.log('🧠 ML models ready');
+            console.log('📡 Live API + ML fallback enabled');
+        });
     </script>
 </body>
 </html>

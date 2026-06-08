@@ -6,7 +6,9 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.cluster import DBSCAN
 from database import init_database, SolarHistorical, WindHistorical
 import joblib
+from pathlib import Path
 from datetime import datetime, timedelta
+import os
 
 class RenewableEnergyPredictor:
     def __init__(self):
@@ -14,6 +16,23 @@ class RenewableEnergyPredictor:
         self.solar_model = None
         self.wind_model = None
         self.scaler = StandardScaler()
+    
+    def load_models(self):
+        """Load trained models from disk"""
+        solar_path = Path('solar_model.pkl')
+        wind_path = Path('wind_model.pkl')
+        
+        if solar_path.exists():
+            self.solar_model = joblib.load(solar_path)
+            print("✅ Solar model loaded")
+        else:
+            print("⚠️ Solar model not found, will train on next run")
+        
+        if wind_path.exists():
+            self.wind_model = joblib.load(wind_path)
+            print("✅ Wind model loaded")
+        else:
+            print("⚠️ Wind model not found, will train on next run")
     
     def prepare_training_data(self, years_back=10):
         """Extract historical data for ML training"""
@@ -79,7 +98,7 @@ class RenewableEnergyPredictor:
         print("Preparing training data...")
         solar_data, wind_data = self.prepare_training_data(years_back=5)
         
-        if solar_data:
+        if solar_data and solar_data[0] is not None:
             X_solar, y_solar = solar_data
             print(f"Training solar model on {len(X_solar)} samples...")
             
@@ -107,8 +126,11 @@ class RenewableEnergyPredictor:
             
             # Save model
             joblib.dump(self.solar_model, 'solar_model.pkl')
+            print("✅ Solar model saved to solar_model.pkl")
+        else:
+            print("⚠️ No solar training data available")
         
-        if wind_data:
+        if wind_data and wind_data[0] is not None:
             X_wind, y_wind = wind_data
             print(f"Training wind model on {len(X_wind)} samples...")
             
@@ -126,6 +148,9 @@ class RenewableEnergyPredictor:
             
             # Save model
             joblib.dump(self.wind_model, 'wind_model.pkl')
+            print("✅ Wind model saved to wind_model.pkl")
+        else:
+            print("⚠️ No wind training data available")
         
         print("Model training complete!")
     
@@ -136,10 +161,17 @@ class RenewableEnergyPredictor:
         
         # Create feature vector
         features = self._create_prediction_features(lat, lon, date)
+        features_array = np.array([features])
         
         # Make predictions
-        solar_pred = self.solar_model.predict([features])[0] if self.solar_model else 0
-        wind_pred = self.wind_model.predict([features])[0] if self.wind_model else 0
+        solar_pred = 0
+        wind_pred = 0
+        
+        if self.solar_model:
+            solar_pred = self.solar_model.predict(features_array)[0]
+        
+        if self.wind_model:
+            wind_pred = self.wind_model.predict(features_array)[0]
         
         # Convert to scores (0-100)
         solar_score = min(100, max(0, (solar_pred - 50) / 250 * 100))
@@ -152,6 +184,70 @@ class RenewableEnergyPredictor:
             'solar_power_wm2': round(solar_pred, 1),
             'wind_power_wm2': round(wind_pred, 1)
         }
+    
+    def predict_with_confidence(self, lat, lon, date=None):
+        """Predict with confidence interval"""
+        if date is None:
+            date = datetime.now()
+        
+        features = self._create_prediction_features(lat, lon, date)
+        features_array = np.array([features])
+        
+        # Get predictions with confidence (using tree variance for RF)
+        solar_pred = 0
+        wind_pred = 0
+        solar_std = 0
+        wind_std = 0
+        
+        if self.solar_model:
+            if hasattr(self.solar_model, 'estimators_'):
+                # Random Forest - get variance across trees
+                predictions = [tree.predict(features_array)[0] for tree in self.solar_model.estimators_]
+                solar_pred = np.mean(predictions)
+                solar_std = np.std(predictions)
+            else:
+                solar_pred = self.solar_model.predict(features_array)[0]
+                solar_std = solar_pred * 0.1  # Assume 10% uncertainty
+        
+        if self.wind_model:
+            if hasattr(self.wind_model, 'estimators_'):
+                predictions = [tree.predict(features_array)[0] for tree in self.wind_model.estimators_]
+                wind_pred = np.mean(predictions)
+                wind_std = np.std(predictions)
+            else:
+                wind_pred = self.wind_model.predict(features_array)[0]
+                wind_std = wind_pred * 0.15
+        
+        # Convert to scores
+        solar_score = min(100, max(0, (solar_pred - 50) / 250 * 100))
+        wind_score = min(100, max(0, (wind_pred - 10) / 500 * 100))
+        
+        return {
+            'solar': round(solar_score, 1),
+            'wind': round(wind_score, 1),
+            'hybrid': round((solar_score + wind_score) / 2, 1),
+            'solar_power_wm2': round(solar_pred, 1),
+            'wind_power_wm2': round(wind_pred, 1),
+            'solar_confidence': round(max(0, min(100, 100 - (solar_std / max(solar_pred, 1) * 100))), 1),
+            'wind_confidence': round(max(0, min(100, 100 - (wind_std / max(wind_pred, 1) * 100))), 1)
+        }
+    
+    def predict_monthly_forecast(self, lat, lon, months=12):
+        """Generate monthly forecast for a location"""
+        forecasts = []
+        base_date = datetime.now().replace(day=15)
+        
+        for i in range(months):
+            forecast_date = base_date + timedelta(days=30 * i)
+            pred = self.predict_with_confidence(lat, lon, forecast_date)
+            forecasts.append({
+                'month': forecast_date.strftime('%b %Y'),
+                'solar': pred['solar'],
+                'wind': pred['wind'],
+                'hybrid': pred['hybrid']
+            })
+        
+        return forecasts
     
     def _create_prediction_features(self, lat, lon, date):
         """Create feature vector for prediction"""
@@ -228,7 +324,27 @@ class RenewableEnergyPredictor:
         
         return []
 
-# Initialize and train
+
+# Initialize and train (if run directly)
 if __name__ == '__main__':
+    print("=" * 60)
+    print("🤖 TerraVolt ML Model Trainer")
+    print("=" * 60)
+    
     predictor = RenewableEnergyPredictor()
-    predictor.train_models()
+    
+    # Try to load existing models first
+    predictor.load_models()
+    
+    # If models don't exist or you want to retrain, uncomment below
+    # print("\n🔄 Training new models...")
+    # predictor.train_models()
+    
+    # Test prediction
+    print("\n📊 Test prediction for Upington, Northern Cape (-28.4, 21.2):")
+    test_pred = predictor.predict_with_confidence(-28.4, 21.2)
+    print(f"   Solar: {test_pred['solar']}/100 (confidence: {test_pred['solar_confidence']}%)")
+    print(f"   Wind: {test_pred['wind']}/100 (confidence: {test_pred['wind_confidence']}%)")
+    print(f"   Hybrid: {test_pred['hybrid']}/100")
+    
+    print("\n✅ ML model module ready!") 
