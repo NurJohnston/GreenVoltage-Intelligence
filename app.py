@@ -71,7 +71,8 @@ def get_solar_score(lat, lon):
         avg_irradiance = sum(values) / len(values)
         avg_irradiance = avg_irradiance * 11.574  # convert MJ/m²/day to W/m²
         #score = min(100, max(0, (avg_irradiance - 50) / 250 * 100))
-        score = min(100, max(0, (avg_irradiance - 289) / 988 * 100))
+        #score = min(100, max(0, (avg_irradiance - 289) / 988 * 100))
+        score = min(100, max(0, (avg_irradiance - 200) / 800 * 100))
         return round(score, 1), avg_irradiance
         
     except Exception as e:
@@ -296,7 +297,7 @@ def generate_heatmap():
     data = request.get_json()
     bounds = data.get('bounds')
     energy_type = data.get('type', 'hybrid')
-    resolution = data.get('resolution', 25)  # Higher resolution = slower
+    resolution = data.get('resolution', 10)  # Higher resolution = slower
     
     lat_step = (bounds['north'] - bounds['south']) / resolution
     lon_step = (bounds['east'] - bounds['west']) / resolution
