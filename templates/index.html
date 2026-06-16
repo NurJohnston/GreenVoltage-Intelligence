@@ -299,6 +299,7 @@
             <div id="results" style="display: none;">
                 <div class="info-card">
                     <h3>📊 Live Energy Analysis</h3>
+                    <p style="font-size: 0.7rem; color: #888; margin-bottom: 8px;">Trailing 12-month average from NASA POWER (solar) and Open-Meteo (wind)</p>
                     <div id="location-name" style="color: #2ecc71; margin-bottom: 8px; font-size: 0.9rem;"></div>
                     
                     <div class="metric">
@@ -329,6 +330,7 @@
                 
                 <div class="info-card" id="ml-comparison" style="display: none;">
                     <h3>🧠 ML Prediction</h3>
+                    <p style="font-size: 0.7rem; color: #888; margin-bottom: 8px;">Annual average from 40+ years of historical training data</p>
                     <div class="metric">
                         <span>ML Solar:</span>
                         <span id="ml-solar" class="score-solar">-</span>
@@ -355,6 +357,7 @@
                 
                 <div class="info-card" id="forecast-section" style="display: none;">
                     <h3>📈 12-Month ML Forecast</h3>
+                    <p style="font-size: 0.7rem; color: #888; margin-bottom: 8px;">Predicted month-by-month, not averaged — shows seasonal swing</p>
                     <canvas id="forecastChart" height="180"></canvas>
                 </div>
             </div>

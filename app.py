@@ -45,34 +45,50 @@ def get_cache_key(lat, lon, data_type='analysis'):
 
 def get_solar_score(lat, lon):
     """Get live solar data from NASA POWER"""
+    print(f">>> get_solar_score CALLED for ({lat}, {lon})")
     try:
         url = "https://power.larc.nasa.gov/api/temporal/daily/point"
+        end_dt = datetime.now() - timedelta(days=90)  # NASA POWER has ~1 month lag
+        start_dt = end_dt - timedelta(days=365)
+        print(f"DEBUG date range: start={start_dt.strftime('%Y%m%d')}, end={end_dt.strftime('%Y%m%d')}")
         params = {
             'parameters': 'ALLSKY_SFC_SW_DWN',
             'community': 'RE',
             'longitude': lon,
             'latitude': lat,
-            'start': '20230101',
-            'end': '20231231',
+            #'start': '20230101',
+            #'end': '20231231',
+            'start': start_dt.strftime('%Y%m%d'),
+            'end': end_dt.strftime('%Y%m%d'),
             'format': 'JSON'
         }
         response = requests.get(url, params=params, timeout=15)
         data = response.json()
         
         if 'properties' not in data or 'parameter' not in data['properties']:
+            print(f"NASA response missing expected fields for ({lat},{lon}): {data}")
             return None, None
         
         solar_data = data['properties']['parameter'].get('ALLSKY_SFC_SW_DWN', {})
-        values = [v for v in solar_data.values() if v is not None]
+        raw_values = list(solar_data.values())
+        #values = [v for v in solar_data.values() if v is not None]
+        values = [v for v in raw_values if v is not None and v > -900]
+
+        print(f"DEBUG solar ({lat},{lon}): n_raw={len(raw_values)}, "
+              f"n_valid={len(values)}, first5={raw_values[:5]}, last10={raw_values[-10:]}")
         
         if not values:
             return None, None
         
         avg_irradiance = sum(values) / len(values)
         avg_irradiance = avg_irradiance * 11.574  # convert MJ/m²/day to W/m²
+        avg_mj = avg_irradiance / 11.574  # Convert back to MJ/m²/day
         #score = min(100, max(0, (avg_irradiance - 50) / 250 * 100))
         #score = min(100, max(0, (avg_irradiance - 289) / 988 * 100))
-        score = min(100, max(0, (avg_irradiance - 200) / 800 * 100))
+        #score = min(100, max(0, (avg_irradiance - 200) / 800 * 100))
+        #score = min(100, max(0, (avg_irradiance - 3.5) / (7.5 - 3.5) * 100))
+        #score = min(100, max(0, (avg_mj - 3.5) / (7.5 - 3.5) * 100))
+        score = min(100, max(0, (avg_mj - 1.46) / 8.11 * 100))
         return round(score, 1), avg_irradiance
         
     except Exception as e:
@@ -88,22 +104,29 @@ def get_wind_score(lat, lon):
     """Get live wind data from Open-Meteo"""
     try:
         url = "https://archive-api.open-meteo.com/v1/archive"
+        end_dt = datetime.now() - timedelta(days=10)  # Open-Meteo archive lag
+        start_dt = end_dt - timedelta(days=365)
         params = {
             'latitude': lat,
             'longitude': lon,
-            'start_date': '2023-01-01',
-            'end_date': '2023-12-31',
-            'hourly': 'wind_speed_10m',
+            #'start_date': '2023-01-01',
+            #'end_date': '2023-12-31',
+            'start_date': start_dt.strftime('%Y-%m-%d'),
+            'end_date': end_dt.strftime('%Y-%m-%d'),
+            #'hourly': 'wind_speed_10m',
+            'daily': 'wind_speed_10m_max',
             'wind_speed_unit': 'ms',
             'timezone': 'auto'
         }
         response = requests.get(url, params=params, timeout=15)
         data = response.json()
         
-        if 'hourly' not in data:
+        #if 'hourly' not in data:
+        if 'daily' not in data:
             return None, None
         
-        wind_speeds = data['hourly']['wind_speed_10m']
+        #wind_speeds = data['hourly']['wind_speed_10m']
+        wind_speeds = data['daily']['wind_speed_10m_max']
         valid_speeds = [s for s in wind_speeds if s is not None]
         
         if not valid_speeds:
@@ -111,7 +134,9 @@ def get_wind_score(lat, lon):
         
         avg_wind_speed = sum(valid_speeds) / len(valid_speeds)
         #score = min(100, max(0, (avg_wind_speed - 3) / 12 * 100))
-        score = min(100, max(0, (avg_wind_speed - 2.9) / (14.9 - 2.9) * 100))
+        #score = min(100, max(0, (avg_wind_speed - 2.9) / (14.9 - 2.9) * 100))
+        #score = min(100, max(0, (avg_wind_speed - 2.5) / (17 - 2.9) * 100))
+        score = min(100, max(0, (avg_wind_speed - 2.87) / (14.91 - 2.87) * 100))
         return round(score, 1), avg_wind_speed
         
     except Exception as e:
@@ -193,14 +218,16 @@ def analyze():
     # If live APIs fail, use ML predictions
     if solar_score is None or wind_score is None:
         data_source = 'ml_fallback'
-        ml_pred = ml_predictor.predict_with_confidence(lat, lon)
+        #ml_pred = ml_predictor.predict_with_confidence(lat, lon)
+        ml_pred = ml_predictor.predict_annual_average(lat, lon)
         solar_score = ml_pred['solar']
         wind_score = ml_pred['wind']
         solar_irradiance = ml_pred.get('solar_power_wm2', 150)
         wind_speed = ml_pred.get('wind_power_wm2', 5) ** (1/3)  # Approximate
     else:
         # Still get ML prediction for comparison
-        ml_pred = ml_predictor.predict_with_confidence(lat, lon)
+        #ml_pred = ml_predictor.predict_with_confidence(lat, lon)
+        ml_pred = ml_predictor.predict_annual_average(lat, lon)
     
     hybrid_score = get_hybrid_score(solar_score, wind_score)
     
@@ -276,7 +303,8 @@ def top_locations():
     
     # Get ML scores for each location
     for loc in locations:
-        pred = ml_predictor.predict_with_confidence(loc['lat'], loc['lon'])
+        #pred = ml_predictor.predict_with_confidence(loc['lat'], loc['lon'])
+        pred = ml_predictor.predict_annual_average(loc['lat'], loc['lon'])
         loc['solar'] = pred['solar']
         loc['wind'] = pred['wind']
         loc['hybrid'] = pred['hybrid']
