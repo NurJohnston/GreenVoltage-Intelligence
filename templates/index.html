@@ -297,8 +297,43 @@
             </div>
             
             <div id="results" style="display: none;">
+                <!-- Live Data Card -->
+                <div class="info-card" id="live-data-card" style="display: none;">
+                    <h3>📡 Live Data</h3>
+                    <p style="font-size: 0.7rem; color: #888; margin-bottom: 8px;">Current real-time readings from Open-Meteo</p>
+                    <div id="live-data-content">
+                        <div class="metric">
+                            <span>☀️ Solar Radiation:</span>
+                            <span id="live-solar" class="score-solar">-- W/m²</span>
+                        </div>
+                        <div class="metric">
+                            <span>☀️ Live Solar Score:</span>
+                            <span id="live-solar-score" class="score-solar">--/100</span>
+                        </div>
+                        <div class="metric">
+                            <span>💨 Wind Speed:</span>
+                            <span id="live-wind-speed" class="score-wind">-- m/s</span>
+                        </div>
+                        <div class="metric">
+                            <span>💨 Live Wind Score:</span>
+                            <span id="live-wind-score" class="score-wind">--/100</span>
+                        </div>
+                        <div class="metric">
+                            <span>💨 Wind Gust:</span>
+                            <span id="live-wind-gust" class="score-wind">-- m/s</span>
+                        </div>
+                        <div class="metric">
+                            <span>🧭 Wind Direction:</span>
+                            <span id="live-wind-dir">--</span>
+                        </div>
+                        <div style="font-size: 0.7rem; color: #888; text-align: right; margin-top: 5px;">
+                            Updated: <span id="live-timestamp">--</span>
+                        </div>
+                    </div>
+                </div>
+
                 <div class="info-card">
-                    <h3>📊 Live Energy Analysis</h3>
+                    <h3>📊 Energy Analysis</h3>
                     <p style="font-size: 0.7rem; color: #888; margin-bottom: 8px;">Trailing 12-month average from NASA POWER (solar) and Open-Meteo (wind)</p>
                     <div id="location-name" style="color: #2ecc71; margin-bottom: 8px; font-size: 0.9rem;"></div>
                     
@@ -354,7 +389,42 @@
                         <span id="data-source-badge"></span>
                     </div>
                 </div>
-                
+
+                <!-- Ethical AI & Community Impact Card -->
+                <div class="info-card" id="ethics-card" style="display: none;">
+                    <h3>⚖️ AI Ethics & Community Impact</h3>
+                    <div id="ethics-content">
+                        <div id="ethics-safeguard" style="margin-bottom: 12px;">
+                            <p style="font-size: 0.85rem; color: #ddd; background: #1a1a3a; padding: 10px; border-radius: 5px; border-left: 3px solid #f39c12;">
+                                <strong>⚠️ Important:</strong> This analysis is a planning support tool.<br>
+                                Before any project proceeds, stakeholders must:
+                            </p>
+                            <div style="margin: 8px 0; font-size: 0.8rem; color: #aaa;">
+                                <label><input type="checkbox" id="ethics-check-1" onchange="checkEthicsAcknowledged()"> ✓ Consult local communities</label><br>
+                                <label><input type="checkbox" id="ethics-check-2" onchange="checkEthicsAcknowledged()"> ✓ Verify land ownership rights</label><br>
+                                <label><input type="checkbox" id="ethics-check-3" onchange="checkEthicsAcknowledged()"> ✓ Conduct environmental impact studies</label><br>
+                                <label><input type="checkbox" id="ethics-check-4" onchange="checkEthicsAcknowledged()"> ✓ Confirm grid connection feasibility</label>
+                            </div>
+                            <button id="ethics-acknowledge-btn" onclick="revealEthicsResult()" disabled style="background: #555; color: #aaa; cursor: not-allowed; width: 100%; padding: 8px; border: none; border-radius: 5px; margin-top: 5px;">
+                                Acknowledge to View Recommendation
+                            </button>
+                        </div>
+                        <div id="ethics-result" style="display: none; margin-top: 10px;">
+                            <div class="metric">
+                                <span>🤖 AI Recommendation Confidence:</span>
+                                <span id="confidence-display" class="score-hybrid">--%</span>
+                            </div>
+                            <div style="margin: 10px 0;">
+                                <p style="font-size: 0.8rem; color: #aaa; margin-bottom: 5px;">Community Benefit Potential</p>
+                                <div style="background: #2a2a4a; border-radius: 10px; height: 20px; overflow: hidden;">
+                                    <div id="community-benefit-bar" style="width: 0%; height: 100%; background: linear-gradient(to right, #3498db, #2ecc71, #f39c12, #e74c3c); border-radius: 10px;"></div>
+                                </div>
+                                <span id="community-benefit-label" style="font-size: 0.85rem; color: #2ecc71;">--</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 <div class="info-card" id="forecast-section" style="display: none;">
                     <h3>📈 12-Month ML Forecast</h3>
                     <p style="font-size: 0.7rem; color: #888; margin-bottom: 8px;">Predicted month-by-month, not averaged — shows seasonal swing</p>
@@ -383,7 +453,7 @@
                         <option value="wind">Wind Only</option>
                     </select>
                     <button onclick="toggleHeatmap()">🌡️ Show Heatmap</button>
-                    <button onclick="findHotspots()">⭐ Find Hotspots</button>
+                    <!--<button onclick="findHotspots()">⭐ Find Hotspots</button>-->
                     <button onclick="clearHotspots()">🗑️ Clear Hotspots</button>
                 </div>
             </div>
@@ -432,33 +502,46 @@
         var currentEnergyType = 'hybrid';
         var forecastChart = null;
         
-        function turboColor(t) {
-            t = Math.max(0, Math.min(1, t));
-            var r, g, b;
-            
-            if (t < 0.2) {
-                r = 0.1 + t * 4.0;
-                g = t * 4.0;
-                b = 0.5 + t * 5.0;
-            } else if (t < 0.5) {
-                r = 0.9;
-                g = 0.4 + (t - 0.1) * 2.0;
-                b = 1.0;
-            } else if (t < 0.8) {
-                r = 0.9 - (t - 0.5) * 2.0;
-                g = 1.0;
-                b = 1.0 - (t - 0.3) * 3.3;
+        function getColor(intensity) {
+            if (intensity < 0.25) return '#0000FF';
+            else if (intensity < 0.50) return '#00BFFF';
+            else if (intensity < 0.75) return '#00FF00';
+            else if (intensity < 0.90) return '#FFD700';
+            else return '#FF0000';
+        }
+
+        function checkEthicsAcknowledged() {
+            var checkboxes = document.querySelectorAll('#ethics-safeguard input[type="checkbox"]');
+            var allChecked = true;
+            checkboxes.forEach(function(cb) {
+                if (!cb.checked) allChecked = false;
+            });
+            var btn = document.getElementById('ethics-acknowledge-btn');
+            btn.disabled = !allChecked;
+            if (allChecked) {
+                btn.style.background = '#2ecc71';
+                btn.style.color = '#0a0a2a';
+                btn.style.cursor = 'pointer';
             } else {
-                r = 0.3 - (t - 0.8) * 1.5;
-                g = 1.0 - (t - 0.7) * 3.0;
-                b = 0.0;
+                btn.style.background = '#555';
+                btn.style.color = '#aaa';
+                btn.style.cursor = 'not-allowed';
             }
-            
-            r = Math.round(255 * Math.max(0, Math.min(1, r)));
-            g = Math.round(255 * Math.max(0, Math.min(1, g)));
-            b = Math.round(255 * Math.max(0, Math.min(1, b)));
-            
-            return 'rgb(' + r + ',' + g + ',' + b + ')';
+        }
+
+        function revealEthicsResult() {
+            document.getElementById('ethics-safeguard').style.display = 'none';
+            document.getElementById('ethics-result').style.display = 'block';
+
+            var data = window._pendingEthicsData;
+            document.getElementById('confidence-display').innerHTML = data.confidence + '%';
+
+            var communityScore = Math.min(100, data.hybridScore * 0.8);
+            document.getElementById('community-benefit-bar').style.width = communityScore + '%';
+            var label = document.getElementById('community-benefit-label');
+            if (communityScore >= 70) label.innerHTML = 'High 🟢';
+            else if (communityScore >= 45) label.innerHTML = 'Medium 🟡';
+            else label.innerHTML = 'Low 🔴';
         }
         
         async function analyzeLocation(lat, lon) {
@@ -471,16 +554,19 @@
             document.getElementById('location-name').innerHTML = 'Analyzing...';
             document.getElementById('ml-comparison').style.display = 'none';
             document.getElementById('forecast-section').style.display = 'none';
+            document.getElementById('live-data-card').style.display = 'none';
+            document.getElementById('ethics-card').style.display = 'none';
             
             try {
+                // --- 1. FETCH ENERGY ANALYSIS (12-MONTH AVERAGE) ---
                 var response = await fetch('/api/analyze', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ lat: lat, lon: lon })
                 });
-                
                 var data = await response.json();
                 
+                // Display Energy Analysis
                 document.getElementById('location-name').innerHTML = '📍 ' + data.location;
                 document.getElementById('solar-score').innerHTML = data.solar_score + '/100';
                 document.getElementById('solar-irradiance').innerHTML = data.solar_irradiance + ' W/m²';
@@ -489,6 +575,37 @@
                 document.getElementById('hybrid-score').innerHTML = data.hybrid_score + '/100';
                 document.getElementById('recommendation').innerHTML = data.recommendation;
                 
+                // --- 2. FETCH LIVE DATA (TODAY'S ACTUAL READINGS) ---
+                var liveCard = document.getElementById('live-data-card');
+                liveCard.style.display = 'block';
+                
+                try {
+                    var liveResponse = await fetch('/api/live', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ lat: lat, lon: lon })
+                    });
+                    var liveData = await liveResponse.json();
+                    
+                    // Display live data (TODAY's readings)
+                    document.getElementById('live-solar').innerHTML = liveData.solar_radiation + ' W/m²';
+                    document.getElementById('live-solar-score').innerHTML = liveData.solar_score + '/100';
+                    document.getElementById('live-wind-speed').innerHTML = liveData.wind_speed + ' m/s';
+                    document.getElementById('live-wind-score').innerHTML = liveData.wind_score + '/100';
+                    document.getElementById('live-wind-gust').innerHTML = 'N/A';
+                    document.getElementById('live-wind-dir').innerHTML = 'N/A';
+                    document.getElementById('live-timestamp').innerHTML = new Date(liveData.timestamp).toLocaleTimeString();
+                    
+                } catch (liveError) {
+                    console.log('Live data error:', liveError);
+                    document.getElementById('live-solar').innerHTML = '-- W/m²';
+                    document.getElementById('live-solar-score').innerHTML = '--/100';
+                    document.getElementById('live-wind-speed').innerHTML = '-- m/s';
+                    document.getElementById('live-wind-score').innerHTML = '--/100';
+                    document.getElementById('live-timestamp').innerHTML = '--';
+                }
+                
+                // --- 3. ML COMPARISON ---
                 if (data.ml_scores) {
                     document.getElementById('ml-comparison').style.display = 'block';
                     document.getElementById('ml-solar').innerHTML = data.ml_scores.solar + '/100';
@@ -508,6 +625,24 @@
                     }
                 }
                 
+                // --- 4. ETHICS CARD ---
+                var ethicsCard = document.getElementById('ethics-card');
+                ethicsCard.style.display = 'block';
+                document.getElementById('ethics-safeguard').style.display = 'block';
+                document.getElementById('ethics-result').style.display = 'none';
+                document.getElementById('ethics-acknowledge-btn').disabled = true;
+                document.getElementById('ethics-acknowledge-btn').style.background = '#555';
+                document.getElementById('ethics-acknowledge-btn').style.color = '#aaa';
+                document.getElementById('ethics-acknowledge-btn').style.cursor = 'not-allowed';
+                document.querySelectorAll('#ethics-safeguard input[type="checkbox"]').forEach(function(cb) {
+                    cb.checked = false;
+                });
+                window._pendingEthicsData = {
+                    confidence: data.ml_scores ? data.ml_scores.solar_confidence || 85 : 85,
+                    hybridScore: data.hybrid_score || 0
+                };
+                
+                // --- 5. FORECAST ---
                 if (data.forecast && data.forecast.length) {
                     document.getElementById('forecast-section').style.display = 'block';
                     renderForecastChart(data.forecast);
@@ -699,7 +834,7 @@
             
             data.data.forEach(function(point) {
                 var intensity = point.intensity;
-                var color = turboColor(intensity);
+                var color = getColor(intensity);
                 
                 var rect = L.rectangle([
                     [point.lat, point.lon],
@@ -728,11 +863,11 @@
                 var div = L.DomUtil.create('div', 'heatmap-legend');
                 div.innerHTML = '<div class="legend">' +
                     '<strong>' + currentEnergyType.toUpperCase() + ' Potential</strong><br>' +
-                    '<div><span class="legend-color" style="background:rgb(25,25,200)"></span> Low (0-25)</div>' +
-                    '<div><span class="legend-color" style="background:rgb(25,200,200)"></span> Moderate (25-50)</div>' +
-                    '<div><span class="legend-color" style="background:rgb(25,200,25)"></span> Good (50-75)</div>' +
-                    '<div><span class="legend-color" style="background:rgb(230,150,0)"></span> High (75-90)</div>' +
-                    '<div><span class="legend-color" style="background:rgb(200,25,25)"></span> Excellent (90-100)</div>' +
+                    '<div><span class="legend-color" style="background:#0000FF"></span> Low (0-25)</div>' +
+                    '<div><span class="legend-color" style="background:#00BFFF"></span> Moderate (25-50)</div>' +
+                    '<div><span class="legend-color" style="background:#00FF00"></span> Good (50-75)</div>' +
+                    '<div><span class="legend-color" style="background:#FFD700"></span> High (75-90)</div>' +
+                    '<div><span class="legend-color" style="background:#FF0000"></span> Excellent (90-100)</div>' +
                     '<small>ML predictions · ' + new Date().toLocaleDateString() + '</small>' +
                     '</div>';
                 return div;
@@ -746,62 +881,6 @@
                 map.removeLayer(marker);
             });
             hotspotMarkers = [];
-        }
-        
-        async function findHotspots() {
-            clearHotspots();
-            
-            var bounds = map.getBounds();
-            var heatmapType = document.getElementById('heatmap-type').value;
-            
-            try {
-                var response = await fetch('/api/hotspots', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        bounds: {
-                            min_lat: bounds.getSouth(),
-                            max_lat: bounds.getNorth(),
-                            min_lon: bounds.getWest(),
-                            max_lon: bounds.getEast()
-                        },
-                        type: heatmapType,
-                        min_score: 70
-                    })
-                });
-                
-                var data = await response.json();
-                
-                if (!data.hotspots || data.hotspots.length === 0) {
-                    alert('No hotspots found in this area. Try zooming out or changing energy type.');
-                } else {
-                    alert('🔥 Found ' + data.hotspots.length + ' renewable energy hotspots in South Africa!');
-                }
-                
-                data.hotspots.forEach(function(hotspot) {
-                    var marker = L.marker([hotspot.center_lat, hotspot.center_lon])
-                        .bindPopup('<b>🔥 SA Renewable Hotspot</b><br>' +
-                            '<b>' + heatmapType.toUpperCase() + ' Score:</b> ' + hotspot.intensity + '/100<br>' +
-                            '<b>Area:</b> ' + Math.round(hotspot.area_km2).toLocaleString() + ' km²<br>' +
-                            '<b>Points:</b> ' + (hotspot.point_count || 'N/A') + '<br>' +
-                            '⚡ Excellent potential for ' + heatmapType + ' energy!')
-                        .addTo(map);
-                    
-                    var circle = L.circle([hotspot.center_lat, hotspot.center_lon], {
-                        radius: Math.min(hotspot.radius_km * 1000, 150000),
-                        color: '#e74c3c',
-                        fillColor: '#e74c3c',
-                        fillOpacity: 0.1,
-                        weight: 2
-                    }).addTo(map);
-                    
-                    hotspotMarkers.push(marker, circle);
-                });
-                
-            } catch (error) {
-                console.error('Error finding hotspots:', error);
-                alert('Hotspot detection error. Please check if the server is running.');
-            }
         }
         
         map.on('moveend', function() {

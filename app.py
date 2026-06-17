@@ -269,6 +269,51 @@ def analyze():
     
     return jsonify(result)
 
+@app.route('/api/live', methods=['POST'])
+def get_live():
+    """Get TODAY'S actual readings (not averaged)"""
+    data = request.get_json()
+    lat = data.get('lat')
+    lon = data.get('lon')
+    
+    if lat is None or lon is None:
+        return jsonify({'error': 'Missing coordinates'}), 400
+    
+    try:
+        # Open-Meteo FORECAST API - gives TODAY'S actual reading
+        url = "https://api.open-meteo.com/v1/forecast"
+        params = {
+            'latitude': lat,
+            'longitude': lon,
+            'current': 'shortwave_radiation,wind_speed_10m',
+            'wind_speed_unit': 'ms',
+            'timezone': 'auto'
+        }
+        response = requests.get(url, params=params, timeout=10)
+        data = response.json()
+        
+        current = data.get('current', {})
+        
+        # TODAY'S actual values (not averaged)
+        current_solar_wm2 = current.get('shortwave_radiation', 0)
+        current_wind = current.get('wind_speed_10m', 0)
+        
+        # Score TODAY'S values using the same formula
+        solar_mj = current_solar_wm2 / 11.574
+        solar_score = min(100, max(0, (solar_mj - 1.46) / 8.11 * 100))
+        wind_score = min(100, max(0, (current_wind - 2.87) / (14.91 - 2.87) * 100))
+        
+        return jsonify({
+            'solar_radiation': round(current_solar_wm2, 1),
+            'solar_score': round(solar_score, 1),
+            'wind_speed': round(current_wind, 1),
+            'wind_score': round(wind_score, 1),
+            'timestamp': datetime.now().isoformat()
+        })
+        
+    except Exception as e:
+        print(f"Live API error: {e}")
+        return jsonify({'error': 'Failed to fetch live data'}), 500
 
 @app.route('/api/forecast', methods=['POST'])
 def get_forecast():
