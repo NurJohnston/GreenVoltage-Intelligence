@@ -176,7 +176,8 @@ class RenewableEnergyPredictor:
             wind_pred = self.wind_model.predict(features_array)[0]
         
         # Convert to scores (0-100)
-        solar_score = min(100, max(0, (solar_pred - 50) / 250 * 100))
+        #solar_score = min(100, max(0, (solar_pred - 50) / 250 * 100))
+        solar_score = min(100, max(0, (solar_pred - 1.46) / 8.11 * 100))
         wind_score = min(100, max(0, (wind_pred - 10) / 500 * 100))  # Wind power density scaling
         
         return {
@@ -226,7 +227,8 @@ class RenewableEnergyPredictor:
         #solar_score = min(100, max(0, (solar_pred - 50) / 250 * 100))
         #solar_score = min(100, max(0, (solar_pred - 100) / 900 * 100))
         #solar_score = min(100, max(0, (solar_pred - 289) / 988 * 100))
-        solar_score = min(100, max(0, (solar_pred - 200) / 800 * 100))
+        #solar_score = min(100, max(0, (solar_pred - 200) / 800 * 100))
+        solar_score = min(100, max(0, (solar_pred - 1.46) / 8.11 * 100))
         #wind_score = min(100, max(0, (wind_pred - 10) / 500 * 100))
         #wind_score = min(100, max(0, (wind_pred - 10) / 800 * 100))
         #wind_score = min(100, max(0, (wind_pred - 14) / (2028 - 14) * 100))
@@ -258,6 +260,31 @@ class RenewableEnergyPredictor:
             })
         
         return forecasts
+
+    def predict_annual_average(self, lat, lon):
+        """Average prediction across all 12 months — comparable to a trailing-12-month live average"""
+        from datetime import datetime
+        solar_vals = []
+        wind_vals = []
+        for month in range(1, 13):
+            d = datetime(2026, month, 15)
+            r = self.predict_with_confidence(lat, lon, d)
+            solar_vals.append(r['solar_power_wm2'])
+            wind_vals.append(r['wind_power_wm2'])
+
+        avg_solar_raw = sum(solar_vals) / len(solar_vals)
+        avg_wind_raw = sum(wind_vals) / len(wind_vals)
+
+        solar_score = min(100, max(0, (avg_solar_raw - 1.46) / 8.11 * 100))
+        wind_score = min(100, max(0, (avg_wind_raw - 50) / 500 * 100))
+
+        return {
+            'solar': round(solar_score, 1),
+            'wind': round(wind_score, 1),
+            'hybrid': round((solar_score + wind_score) / 2, 1),
+            'solar_power_wm2': round(avg_solar_raw, 2),
+            'wind_power_wm2': round(avg_wind_raw, 1)
+        }
     
     def _create_prediction_features(self, lat, lon, date):
         """Create feature vector for prediction"""
